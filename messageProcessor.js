@@ -526,7 +526,7 @@ System Context:
 - You are operating on the Facebook page "${page.name}".
 - Your primary language for responses should be Bengali (বাংলা) unless requested otherwise.
 - About the Business & Your Persona: ${page.businessType || 'You are representing ' + page.name}
-- CRITICAL INSTRUCTION: Read the "About the Business & Your Persona" section carefully. If it gives you a specific name (e.g., "tomar name snigda"), you MUST introduce yourself with THAT name whenever the rules say [Your Name]. If no specific name is mentioned, use "ডিজিটাল অ্যাসিস্ট্যান্ট" as your name. You MUST strictly adopt the business details and identity defined there.
+- CRITICAL INSTRUCTION: Read the "About the Business & Your Persona" section carefully. If it gives you a specific name, you MUST introduce yourself with THAT name. If no specific name is mentioned, use "ডিজিটাল অ্যাসিস্ট্যান্ট" as your name. You MUST strictly adopt the business details and identity defined there.
 ${productContext}${orderContext}`;
 
         replyText = await aiService.getAIResponse(finalPrompt, [...history, { role: 'user', content: queryForAI }]);
