@@ -15,24 +15,27 @@ const adminRoutes = require('./adminRoutes');
 const settingsRoutes = require('./settingsRoutes');
 const { setupWebSocket } = require('./websocket');
 const { protect } = require('./authMiddleware'); // This should be './authMiddleware'
-const IORedis = require('ioredis');
+const useRedis = process.env.USE_REDIS === 'true';
 
-const redisConnection = new IORedis({
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT || 6379,
-  maxRetriesPerRequest: null
-});
+if (useRedis) {
+  const IORedis = require('ioredis');
+  const redisConnection = new IORedis({
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+    maxRetriesPerRequest: null
+  });
 
-redisConnection.on('error', err => {
-    console.error('❌ Could not connect to Redis. Please ensure Redis is running.');
-    // Redis কানেকশন ছাড়া যেহেতু মেসেজ প্রসেসিং সম্ভব নয়, তাই অ্যাপ্লিকেশনটি বন্ধ করে দেওয়া উচিত।
-    // এটি একটি "fail-fast" অ্যাপ্রোচ, যা সমস্যা দ্রুত শনাক্ত করতে সাহায্য করে।
-    console.error('Application is shutting down due to Redis connection failure.');
-    process.exit(1);
-});
+  redisConnection.on('error', err => {
+      console.error('❌ Could not connect to Redis. Please ensure Redis is running.');
+      console.error('Application is shutting down due to Redis connection failure.');
+      process.exit(1);
+  });
 
-// ওয়ার্কারকে ইম্পোর্ট করুন যাতে এটি কাজ শুরু করতে পারে
-require('./messageWorker');
+  // ওয়ার্কারকে ইম্পোর্ট করুন যাতে এটি কাজ শুরু করতে পারে
+  require('./messageWorker');
+} else {
+  console.log('Redis is disabled (USE_REDIS!=true). Using local in-memory message processing.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;

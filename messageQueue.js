@@ -1,16 +1,35 @@
 const { Queue } = require('bullmq');
+const { processMessage } = require('./messageProcessor');
 
-// Use REDIS_URL if available, otherwise fall back to host/port.
-const connection = process.env.REDIS_URL || { host: process.env.REDIS_HOST || '127.0.0.1', port: process.env.REDIS_PORT || 6379 };
+const useRedis = process.env.USE_REDIS === 'true';
+let messageQueue;
 
-// 'messenger-events' নামে একটি নতুন কিউ তৈরি করা হচ্ছে
-const messageQueue = new Queue('messenger-events', { connection });
+if (useRedis) {
+  // Use REDIS_URL if available, otherwise fall back to host/port.
+  const connection = process.env.REDIS_URL || { host: process.env.REDIS_HOST || '127.0.0.1', port: process.env.REDIS_PORT || 6379 };
 
-messageQueue.on('error', (error) => {
-  // Log any errors that the queue encounters
-  console.error('A message queue error occurred:', error);
-});
+  // 'messenger-events' নামে একটি নতুন কিউ তৈরি করা হচ্ছে
+  messageQueue = new Queue('messenger-events', { connection });
 
-console.log("Message queue initialized.");
+  messageQueue.on('error', (error) => {
+    // Log any errors that the queue encounters
+    console.error('A message queue error occurred:', error);
+  });
+
+  console.log("Redis Message queue initialized.");
+} else {
+  // In-memory fallback
+  messageQueue = {
+    add: async (name, data) => {
+      setTimeout(async () => {
+        try {
+          await processMessage(data);
+        } catch (err) {
+          console.error("Local queue processing error:", err);
+        }
+      }, 0);
+    }
+  };
+}
 
 module.exports = messageQueue;
