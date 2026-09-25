@@ -1,0 +1,10 @@
+// d:\allproject\facebookbot\chatbot\messageProcessor.js
+
+// ...
+
+// যদি Human Takeover সক্রিয় থাকে, তাহলে বট কোনো উত্তর দেবে না
+if (page.humanTakeover) {
+    return console.log(`Human takeover is active for page ${pageId}. Bot is silent.`);
+}
+
+// ...

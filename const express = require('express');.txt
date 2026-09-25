@@ -1,0 +1,29 @@
+const express = require('express');
+const router = express.Router();
+const Page = require('../models/Page'); // আপনার মডেল ইম্পোর্ট করুন
+
+// ... অন্যান্য রুট
+
+// একটি পেজের জন্য সিস্টেম প্রম্পট আপডেট করার রুট
+router.put('/pages/:pageId/prompt', async (req, res) => {
+  try {
+    const { pageId } = req.params;
+    const { systemPrompt } = req.body;
+
+    const updatedPage = await Page.findOneAndUpdate(
+      { pageId: pageId },
+      { systemPrompt: systemPrompt },
+      { new: true }
+    );
+
+    if (!updatedPage) {
+      return res.status(404).json({ message: 'Page not found' });
+    }
+
+    res.status(200).json({ message: 'System prompt updated successfully', page: updatedPage });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating system prompt', error: error.message });
+  }
+});
+
+module.exports = router;
