@@ -50,12 +50,11 @@ const executeWithRotation = async (apiCallFunction) => {
  */
 const callGroqWithFallback = async (messages, extraConfig = {}) => {
     const modelsToTry = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.8-27b",
         "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "llama3-70b-8192",
-        "llama3-8b-8192",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it"
+        "llama-3.1-8b-instant"
     ];
 
     let lastError = null;
@@ -83,7 +82,7 @@ const callGroqWithFallback = async (messages, extraConfig = {}) => {
  */
 const callGeminiFallback = async (systemPrompt, userPrompt) => {
     if (!genAI) throw new Error("Google Generative AI is not configured.");
-    const geminiModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    const geminiModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash"];
     
     const promptText = systemPrompt ? `System: ${systemPrompt}\n\nUser: ${userPrompt}` : userPrompt;
 
@@ -159,28 +158,32 @@ const getImageDescriptionForSearch = async (imageUrl) => {
         throw new Error("Google AI is not initialized. Check GOOGLE_API_KEY.");
     }
 
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        const imageBuffer = Buffer.from(response.data, 'binary');
+    const geminiModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
 
-        const imagePart = {
-            inlineData: {
-                data: imageBuffer.toString('base64'),
-                mimeType: response.headers['content-type'] || 'image/jpeg',
-            },
-        };
+    for (const modelName of geminiModels) {
+        try {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            const imageBuffer = Buffer.from(response.data, 'binary');
 
-        const prompt = "Analyze the main product in this image. Describe it using simple, searchable keywords. Focus on category, color, type, and material. For example: 'red cotton t-shirt' or 'black leather handbag'. Provide only the descriptive keywords as a single string.";
+            const imagePart = {
+                inlineData: {
+                    data: imageBuffer.toString('base64'),
+                    mimeType: response.headers['content-type'] || 'image/jpeg',
+                },
+            };
 
-        const result = await model.generateContent([prompt, imagePart]);
-        const aiResponse = await result.response;
-        const text = aiResponse.text();
-        return text.trim().replace(/['"]+/g, '');
-    } catch (error) {
-        console.error("Error getting image description from Gemini:", error);
-        return "";
+            const prompt = "Analyze the main product in this image. Describe it using simple, searchable keywords. Focus on category, color, type, and material. For example: 'red cotton t-shirt' or 'black leather handbag'. Provide only the descriptive keywords as a single string.";
+
+            const result = await model.generateContent([prompt, imagePart]);
+            const aiResponse = await result.response;
+            const text = aiResponse.text();
+            if (text) return text.trim().replace(/['"]+/g, '');
+        } catch (error) {
+            console.warn(`[getImageDescriptionForSearch] Gemini model "${modelName}" failed:`, error.message);
+        }
     }
+    return "";
 };
 
 /**
