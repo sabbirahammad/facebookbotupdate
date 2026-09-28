@@ -28,7 +28,7 @@ if (!googleApiKey) {
 }
 const genAI = googleApiKey ? new GoogleGenerativeAI(googleApiKey) : null;
 
-const DEFAULT_MODEL = "llama-3.3-70b-versatile"; // Reverted to 70b as requested
+const DEFAULT_MODEL = "llama-3.1-8b-instant"; // High speed and supported on all Groq tiers
 
 // Helper function to execute a Groq API call with automatic key rotation on rate limits
 const executeWithRotation = async (apiCallFunction) => {
@@ -231,7 +231,7 @@ Output the 20 rules now:
         const chatCompletion = await executeWithRotation(async (client) => {
             return await client.chat.completions.create({
                 messages: [{ role: "user", content: prompt }],
-                model: "llama-3.3-70b-versatile",
+                model: DEFAULT_MODEL,
                 temperature: 0.7,
             });
         });
@@ -265,7 +265,7 @@ Respond ONLY with a valid JSON array. Do not include any other text, markdown, o
         const chatCompletion = await executeWithRotation(async (client) => {
             return await client.chat.completions.create({
                 messages: [{ role: "user", content: prompt }],
-                model: "llama-3.3-70b-versatile",
+                model: DEFAULT_MODEL,
                 temperature: 0.1,
             });
         });
