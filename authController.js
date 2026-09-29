@@ -10,14 +10,15 @@ exports.initiateFacebookAuth = (req, res) => {
         'email',
         'pages_show_list',
         'pages_messaging',
-        'pages_read_engagement', // To read page content and follower data
-        'pages_manage_metadata', // To manage page settings and webhooks
-        'business_management'    // Often required for managing business assets like Pages
+        'pages_read_engagement',   // To read page content, posts and comments
+        'pages_manage_engagement', // To manage engagement (comments, reactions)
+        'pages_manage_metadata',   // To manage page settings and webhooks
+        'pages_manage_posts'       // Required to reply to post comments
     ].join(',');
 
     const redirectURI = `${process.env.SERVER_URL}/auth/facebook/callback`;
     const clientId = process.env.META_APP_ID;
-    const authURL = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectURI}&scope=${scopes}&response_type=code`;
+    const authURL = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectURI)}&scope=${scopes}&response_type=code`;
     
     console.log("--- Redirecting to Facebook with URL:", authURL);
     res.redirect(authURL);
