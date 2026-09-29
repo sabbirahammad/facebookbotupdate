@@ -95,7 +95,12 @@ const processMessage = async (jobData) => {
 ৩. কাস্টমার যদি দাম বা প্রোডাক্ট জানতে চায়, উপরে থাকা তালিকা দেখে সাহায্য করুন। বিস্তারিত জানতে বা ইনবক্সে যোগাযোগের জন্য বিনীত অনুরোধ জানান।
 ৪. কোনো টাইটেল, হেডার বা কোটেশন মার্ক ব্যবহার করবেন না। সরাসরি পেজের পক্ষ থেকে উত্তর লিখুন।`;
 
-            replyText = await aiService.getAIResponse(commentPrompt, [{ role: 'user', content: commentText }]);
+            try {
+                replyText = await aiService.getAIResponse(commentPrompt, [{ role: 'user', content: commentText }]);
+            } catch (aiErr) {
+                console.error("[Comment AI Error]:", aiErr.message);
+                replyText = `ধন্যবাদ ${senderName}! আপনার সুন্দর কমেন্টের জন্য ধন্যবাদ। যেকোনো প্রশ্ন বা বিস্তারিত তথ্যের জন্য আমাদের ইনবক্সে মেসেজ দিন।`;
+            }
         }
 
         if (replyText) {

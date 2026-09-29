@@ -82,7 +82,7 @@ const callGroqWithFallback = async (messages, extraConfig = {}) => {
  */
 const callGeminiFallback = async (systemPrompt, userPrompt) => {
     if (!genAI) throw new Error("Google Generative AI is not configured.");
-    const geminiModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash"];
+    const geminiModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"];
     
     const promptText = systemPrompt ? `System: ${systemPrompt}\n\nUser: ${userPrompt}` : userPrompt;
 
@@ -159,7 +159,7 @@ const getImageDescriptionForSearch = async (imageUrl) => {
         throw new Error("Google AI is not initialized. Check GOOGLE_API_KEY.");
     }
 
-    const geminiModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
+    const geminiModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"];
 
     for (const modelName of geminiModels) {
         try {
@@ -249,7 +249,7 @@ const findExactVisualMatches = async (imageUrl, products) => {
         )).join('\n');
         const prompt = `The FIRST image is the customer's reference. The remaining images are catalog products in this exact order:\n${candidateList}\n\nReturn only JSON: {"matches":[{"id":"catalog product id","confidence":0.0}]}. Include a product only when it is the exact same catalog item or the exact same set/design. Compare distinctive print, colors, borders, pieces, and layout. Do not match merely because category, color family, or material is similar. If no exact product exists, return {"matches":[]}.`;
 
-        for (const modelName of ["gemini-3.6-flash", "gemini-2.5-flash"]) {
+        for (const modelName of ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"]) {
             try {
                 const model = genAI.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent([prompt, sourceImage, ...imageCandidates.map(candidate => candidate.image)]);

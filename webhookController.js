@@ -94,15 +94,20 @@ exports.processWebhook = (req, res) => {
             // Handle feed changes (Comments on Page Posts)
             if (entry.changes) {
                 entry.changes.forEach(change => {
+                    console.log(`[Webhook Change] Field: ${change.field}`);
                     if (change.field === 'feed') {
                         const val = change.value || {};
-                        if (val.item === 'comment' && val.verb === 'add') {
-                            const commentId = val.comment_id;
-                            const senderId = val.sender_id;
-                            const senderName = val.sender_name || 'User';
-                            const commentText = val.message || '';
+                        console.log(`[Webhook Feed Details] Item: ${val.item}, Verb: ${val.verb}, CommentID: ${val.comment_id || val.id}`);
+                        
+                        if (val.item === 'comment' && (!val.verb || val.verb === 'add')) {
+                            const commentId = val.comment_id || val.id;
+                            const senderId = val.sender_id || val.from?.id;
+                            const senderName = val.sender_name || val.from?.name || 'User';
+                            const commentText = val.message || val.text || '';
                             const postId = val.post_id;
                             const parentId = val.parent_id;
+
+                            console.log(`[Webhook Comment Detected] Page: ${pageId}, Sender: ${senderName} (${senderId}), Text: "${commentText}"`);
 
                             // Avoid self-reply loop if the comment was published by the page itself
                             if (senderId && senderId !== pageId && commentText) {
@@ -116,8 +121,10 @@ exports.processWebhook = (req, res) => {
                                     postId: postId,
                                     parentId: parentId,
                                 };
-                                console.log(`[Webhook] Adding comment job to queue for page ${pageId}, comment ${commentId}`);
+                                console.log(`[Webhook] Queueing comment reply job for page ${pageId}, comment ${commentId}`);
                                 messageQueue.add('messenger-events', jobData);
+                            } else if (senderId === pageId) {
+                                console.log(`[Webhook Comment] Ignored page's own comment to prevent self-reply loop.`);
                             }
                         }
                     }
