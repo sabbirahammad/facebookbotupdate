@@ -186,6 +186,85 @@ const getImageDescriptionForSearch = async (imageUrl) => {
     return "";
 };
 
+const VISUAL_MATCH_MIN_CONFIDENCE = Number(process.env.VISUAL_MATCH_MIN_CONFIDENCE || 0.85);
+const MAX_VISUAL_MATCH_CANDIDATES = 20;
+const MAX_VISUAL_MATCH_IMAGE_BYTES = 8 * 1024 * 1024;
+
+const getImagePart = async (imageUrl) => {
+    const response = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+        maxContentLength: MAX_VISUAL_MATCH_IMAGE_BYTES,
+        maxBodyLength: MAX_VISUAL_MATCH_IMAGE_BYTES,
+        timeout: 15000,
+    });
+    const contentType = response.headers['content-type'] || 'image/jpeg';
+    if (!contentType.startsWith('image/')) {
+        throw new Error(`Expected an image but received ${contentType}.`);
+    }
+    return { inlineData: { data: Buffer.from(response.data).toString('base64'), mimeType: contentType } };
+};
+
+const parseVisualMatches = (responseText, candidateIds, minimumConfidence = VISUAL_MATCH_MIN_CONFIDENCE) => {
+    const cleaned = String(responseText || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) return [];
+
+    let parsed;
+    try {
+        parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+    } catch (error) {
+        return [];
+    }
+    const allowedIds = new Set(candidateIds.map(String));
+    const matches = Array.isArray(parsed.matches) ? parsed.matches : [];
+    return matches
+        .map(match => ({ id: String(match.id || ''), confidence: Number(match.confidence) }))
+        .filter(match => allowedIds.has(match.id) && Number.isFinite(match.confidence) && match.confidence >= minimumConfidence)
+        .sort((a, b) => b.confidence - a.confidence);
+};
+
+/**
+ * Matches the actual reference and catalog images, not generic product labels.
+ */
+const findExactVisualMatches = async (imageUrl, products) => {
+    if (!genAI || !imageUrl || !Array.isArray(products)) return [];
+    const candidates = products.filter(product => product && product._id && product.imageUrl).slice(0, MAX_VISUAL_MATCH_CANDIDATES);
+    if (candidates.length === 0) return [];
+
+    try {
+        const sourceImage = await getImagePart(imageUrl);
+        const imageResults = await Promise.allSettled(candidates.map(async product => ({
+            product,
+            image: await getImagePart(product.imageUrl),
+        })));
+        const imageCandidates = imageResults
+            .filter(result => result.status === 'fulfilled')
+            .map(result => result.value);
+        if (imageCandidates.length === 0) return [];
+
+        const candidateList = imageCandidates.map(({ product }, index) => (
+            `${index + 1}. ID: ${product._id}; Name: ${product.name || 'Unnamed product'}; Description: ${product.description || 'None'}`
+        )).join('\n');
+        const prompt = `The FIRST image is the customer's reference. The remaining images are catalog products in this exact order:\n${candidateList}\n\nReturn only JSON: {"matches":[{"id":"catalog product id","confidence":0.0}]}. Include a product only when it is the exact same catalog item or the exact same set/design. Compare distinctive print, colors, borders, pieces, and layout. Do not match merely because category, color family, or material is similar. If no exact product exists, return {"matches":[]}.`;
+
+        for (const modelName of ["gemini-3.6-flash", "gemini-2.5-flash"]) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent([prompt, sourceImage, ...imageCandidates.map(candidate => candidate.image)]);
+                const response = await result.response;
+                const matches = parseVisualMatches(response.text(), imageCandidates.map(candidate => candidate.product._id));
+                return matches.map(match => imageCandidates.find(candidate => candidate.product._id.toString() === match.id)?.product).filter(Boolean);
+            } catch (error) {
+                console.warn(`[findExactVisualMatches] Gemini model "${modelName}" failed:`, error.message);
+            }
+        }
+    } catch (error) {
+        console.warn('[findExactVisualMatches] Could not load one or more images:', error.message);
+    }
+    return [];
+};
+
 /**
  * Generates a response from the AI based on conversation history and a system prompt.
  */
@@ -305,6 +384,8 @@ module.exports = {
     getAIResponse,
     getIntentAndEntities,
     getImageDescriptionForSearch,
+    findExactVisualMatches,
+    parseVisualMatches,
     generateBusinessRules,
     findBestMatchingProducts
 };

@@ -25,6 +25,26 @@ const processMessage = async (jobData) => {
         const attachment = message.attachments[0];
         if (attachment.type === 'image' && !page.humanTakeover) {
             console.log(`[Visual Search] Received image from user ${psid}. URL: ${attachment.payload.url}`);
+
+            const catalogProducts = await Product.find({ pageId, imageUrl: { $exists: true, $ne: '' } })
+                .sort({ createdAt: -1 })
+                .limit(20)
+                .lean();
+            const verifiedProducts = await aiService.findExactVisualMatches(attachment.payload.url, catalogProducts);
+
+            if (verifiedProducts.length > 0) {
+                await facebookService.sendTextMessage(psid, "\u0986\u09aa\u09a8\u09be\u09b0 \u099b\u09ac\u09bf\u09b0 \u09b8\u09be\u09a5\u09c7 \u09a8\u09bf\u09b6\u09cd\u099a\u09bf\u09a4\u09ad\u09be\u09ac\u09c7 \u09ae\u09c7\u09b2\u09be \u09aa\u09a3\u09cd\u09af\u0997\u09c1\u09b2\u09cb \u09a8\u09bf\u099a\u09c7 \u09a6\u09c7\u0993\u09df\u09be \u09b9\u09b2\u09cb:", pageAccessToken);
+                const elements = verifiedProducts.map(p => ({
+                    title: p.name,
+                    subtitle: `Price: ${p.price} BDT`,
+                    image_url: p.imageUrl,
+                    buttons: [{ type: 'postback', title: 'Buy Now', payload: `BUY_${p._id}` }],
+                }));
+                await facebookService.sendGenericTemplate(psid, elements, pageAccessToken);
+            } else {
+                await facebookService.sendTextMessage(psid, "\u09a6\u09c1\u0983\u0996\u09bf\u09a4, \u099b\u09ac\u09bf\u099f\u09bf\u09b0 \u09b8\u09be\u09a5\u09c7 catalog-\u098f\u09b0 \u0995\u09cb\u09a8\u09cb \u09a8\u09bf\u09b6\u09cd\u099a\u09bf\u09a4 \u09ae\u09bf\u09b2 \u09aa\u09be\u0993\u09df\u09be \u09af\u09be\u09df\u09a8\u09bf\u0964 \u09ad\u09c1\u09b2 product \u09a6\u09c7\u0996\u09be\u09a8\u09cb\u09b0 \u09aa\u09b0\u09bf\u09ac\u09b0\u09cd\u09a4\u09c7 \u0986\u09aa\u09a8\u09bf product code \u0985\u09a5\u09ac\u09be \u0986\u09b0\u0993 \u09aa\u09b0\u09bf\u09b7\u09cd\u0995\u09be\u09b0 \u099b\u09ac\u09bf \u09aa\u09be\u09a0\u09be\u09a4\u09c7 \u09aa\u09be\u09b0\u09c7\u09a8\u0964", pageAccessToken);
+            }
+            return true;
             
             // ১. ছবি থেকে সার্চের জন্য বর্ণনা তৈরি করুন
             const searchKeywords = await aiService.getImageDescriptionForSearch(attachment.payload.url);
