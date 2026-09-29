@@ -10,10 +10,8 @@ exports.initiateFacebookAuth = (req, res) => {
         'email',
         'pages_show_list',
         'pages_messaging',
-        'pages_read_engagement',   // To read page content, posts and comments
-        'pages_manage_engagement', // To manage engagement (comments, reactions)
-        'pages_manage_metadata',   // To manage page settings and webhooks
-        'pages_manage_posts'       // Required to reply to post comments
+        'pages_read_engagement', // To read page content, posts and comments
+        'pages_manage_metadata'  // To manage page settings and webhooks
     ].join(',');
 
     const redirectURI = `${process.env.SERVER_URL}/auth/facebook/callback`;
