@@ -90,6 +90,39 @@ exports.processWebhook = (req, res) => {
                     }
                 });
             }
+
+            // Handle feed changes (Comments on Page Posts)
+            if (entry.changes) {
+                entry.changes.forEach(change => {
+                    if (change.field === 'feed') {
+                        const val = change.value || {};
+                        if (val.item === 'comment' && val.verb === 'add') {
+                            const commentId = val.comment_id;
+                            const senderId = val.sender_id;
+                            const senderName = val.sender_name || 'User';
+                            const commentText = val.message || '';
+                            const postId = val.post_id;
+                            const parentId = val.parent_id;
+
+                            // Avoid self-reply loop if the comment was published by the page itself
+                            if (senderId && senderId !== pageId && commentText) {
+                                const jobData = {
+                                    type: 'comment',
+                                    pageId: pageId,
+                                    commentId: commentId,
+                                    senderId: senderId,
+                                    senderName: senderName,
+                                    commentText: commentText,
+                                    postId: postId,
+                                    parentId: parentId,
+                                };
+                                console.log(`[Webhook] Adding comment job to queue for page ${pageId}, comment ${commentId}`);
+                                messageQueue.add('messenger-events', jobData);
+                            }
+                        }
+                    }
+                });
+            }
         });
 
         res.sendStatus(200);

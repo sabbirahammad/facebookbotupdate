@@ -74,13 +74,25 @@ exports.unsubscribePage = async (req, res) => {
 exports.updatePageConfig = async (req, res) => {
     try {
         const { pageId } = req.params;
-        const { aiSystemPrompt, businessType, useDefaultPrompt } = req.body;
+        const {
+            aiSystemPrompt,
+            businessType,
+            useDefaultPrompt,
+            autoCommentReply,
+            privateReplyEnabled,
+            commentReplyMode,
+            customCommentReply,
+        } = req.body;
         const userId = req.user._id;
 
         const updateFields = {};
         if (aiSystemPrompt !== undefined) updateFields.aiSystemPrompt = aiSystemPrompt;
         if (businessType !== undefined) updateFields.businessType = businessType;
         if (useDefaultPrompt !== undefined) updateFields.useDefaultPrompt = useDefaultPrompt;
+        if (autoCommentReply !== undefined) updateFields.autoCommentReply = autoCommentReply;
+        if (privateReplyEnabled !== undefined) updateFields.privateReplyEnabled = privateReplyEnabled;
+        if (commentReplyMode !== undefined) updateFields.commentReplyMode = commentReplyMode;
+        if (customCommentReply !== undefined) updateFields.customCommentReply = customCommentReply;
 
         // পেজের মালিকানা যাচাই করুন এবং আপডেট করুন
         const updatedPage = await Page.findOneAndUpdate(

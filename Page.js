@@ -40,6 +40,23 @@ const pageSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    autoCommentReply: {
+        type: Boolean,
+        default: true,
+    },
+    privateReplyEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    commentReplyMode: {
+        type: String,
+        enum: ['ai', 'custom'],
+        default: 'ai',
+    },
+    customCommentReply: {
+        type: String,
+        default: '',
+    },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Page', pageSchema);

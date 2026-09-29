@@ -96,13 +96,13 @@ const subscribePageToWebhook = async (pageId, pageAccessToken) => {
     try {
         await axios.post(`${GRAPH_API_BASE_URL}/${pageId}/subscribed_apps`, null, {
             params: {
-                subscribed_fields: 'messages,messaging_postbacks,messaging_referrals',
+                subscribed_fields: 'messages,messaging_postbacks,messaging_referrals,feed',
                 access_token: pageAccessToken,
             },
         });
         console.log(`Successfully subscribed page ${pageId} to webhook.`);
     } catch (error) {
-        console.error(`Error subscribing page ${pageId} to webhook:`, error.response?.data.error.message);
+        console.error(`Error subscribing page ${pageId} to webhook:`, error.response?.data?.error?.message || error.message);
         throw new Error('Failed to subscribe page to webhook.');
     }
 };
@@ -354,6 +354,56 @@ const setupMessengerProfile = async (pageAccessToken) => {
     }
 };
 
+/**
+ * Facebook পোস্টের কমেন্টে উত্তর পাঠানোর ফাংশন
+ * @param {string} commentId - The ID of the comment to reply to.
+ * @param {string} message - The reply message text.
+ * @param {string} pageAccessToken - The page access token.
+ */
+const replyToComment = async (commentId, message, pageAccessToken) => {
+    try {
+        const response = await axios.post(`${GRAPH_API_BASE_URL}/${commentId}/comments`, {
+            message: message,
+        }, {
+            params: { access_token: pageAccessToken },
+        });
+        console.log(`Successfully replied to comment ${commentId}`);
+        return { success: true, data: response.data };
+    } catch (error) {
+        console.error(`Error replying to comment ${commentId}:`, error.response?.data?.error || error.message);
+        throw new Error(error.response?.data?.error?.message || 'Failed to reply to comment');
+    }
+};
+
+/**
+ * কমেন্ট করা ব্যবহারকারীকে প্রাইভেট ইনবক্স মেসেজ পাঠানোর ফাংশন (Private Reply)
+ * @param {string} commentId - The ID of the comment.
+ * @param {string} text - The message text.
+ * @param {string} pageAccessToken - The page access token.
+ */
+const sendPrivateReplyToComment = async (commentId, text, pageAccessToken) => {
+    const requestBody = {
+        recipient: {
+            comment_id: commentId,
+        },
+        message: {
+            text: text,
+        },
+        messaging_type: 'RESPONSE',
+    };
+
+    try {
+        const response = await axios.post(`${GRAPH_API_BASE_URL}/me/messages`, requestBody, {
+            params: { access_token: pageAccessToken },
+        });
+        console.log(`Private reply sent for comment ID: ${commentId}`);
+        return { success: true, data: response.data };
+    } catch (error) {
+        console.error('Error sending private reply to comment:', error.response?.data?.error || error.message);
+        return { success: false, error: error.response?.data?.error || error.message };
+    }
+};
+
 module.exports = {
     exchangeCodeForAccessToken,
     getLongLivedUserToken,
@@ -371,4 +421,6 @@ module.exports = {
     sendTypingOff,
     sendTextMessageWithQuickReplies,
     setupMessengerProfile,
+    replyToComment,
+    sendPrivateReplyToComment,
 };

@@ -44,12 +44,96 @@ const processMessage = async (jobData) => {
     const { type, pageId, psid, message, postback } = jobData;
 
     // ধাপ ১: পেজের তথ্য এবং অ্যাক্সেস টোকেন আনুন
-    const page = await Page.findOne({ pageId }).select('+pageAccessToken +humanTakeover +aiSystemPrompt');
+    const page = await Page.findOne({ pageId }).select('+pageAccessToken +humanTakeover +aiSystemPrompt +autoCommentReply +privateReplyEnabled +commentReplyMode +customCommentReply');
     if (!page) {
         console.error(`Page with ID ${pageId} not found.`);
         return false; // প্রসেসিং ব্যর্থ
     }
     const pageAccessToken = facebookService.decryptToken(page.pageAccessToken);
+
+    // কমেন্ট প্রসেসিং হ্যান্ডেল করুন
+    if (type === 'comment') {
+        const { commentId, senderId, senderName, commentText } = jobData;
+        console.log(`[Comment Reply] Processing comment ${commentId} from ${senderName}: "${commentText}"`);
+
+        if (page.humanTakeover) {
+            console.log(`Human takeover is active for page ${pageId}. Comment auto-reply skipped.`);
+            return true;
+        }
+
+        if (page.autoCommentReply === false) {
+            console.log(`Auto comment reply is disabled for page ${pageId}.`);
+            return true;
+        }
+
+        let replyText = '';
+
+        if (page.commentReplyMode === 'custom' && page.customCommentReply && page.customCommentReply.trim()) {
+            replyText = page.customCommentReply.trim();
+        } else {
+            // AI দিয়ে কমেন্টের রিপ্লাই তৈরি করুন
+            const products = await Product.find({ pageId }).limit(15);
+            let productContext = "";
+            if (products && products.length > 0) {
+                productContext = "\n--- আপনার পেজের বর্তমান প্রোডাক্ট তালিকা ---\n";
+                products.forEach(p => {
+                    productContext += `- ${p.name} (দাম: ${p.price} BDT)\n`;
+                });
+            }
+
+            let systemPromptText = page.aiSystemPrompt || "You are a helpful and polite Facebook page representative.";
+            systemPromptText = systemPromptText.replace(/\[আপনার পেজের নাম\]/g, page.name);
+
+            const commentPrompt = `${systemPromptText}${productContext}
+
+আপনার ফেসবুক পেজের পোস্টে কাস্টমার "${senderName}" কমেন্ট করেছে:
+"${commentText}"
+
+দিকনির্দেশনা (Instructions):
+১. কাস্টমারের কমেন্টের ভাষা (বাংলা বা ইংরেজি) অনুযায়ী আন্তরিক, প্রফেশনাল ও বিনয়ী মন্তব্য (Reply) লিখুন।
+২. উত্তরটি ১-২ লাইনের মধ্যে সংক্ষিপ্ত ও আকর্ষণীয় রাখুন।
+৩. কাস্টমার যদি দাম বা প্রোডাক্ট জানতে চায়, উপরে থাকা তালিকা দেখে সাহায্য করুন। বিস্তারিত জানতে বা ইনবক্সে যোগাযোগের জন্য বিনীত অনুরোধ জানান।
+৪. কোনো টাইটেল, হেডার বা কোটেশন মার্ক ব্যবহার করবেন না। সরাসরি পেজের পক্ষ থেকে উত্তর লিখুন।`;
+
+            replyText = await aiService.getAIResponse(commentPrompt, [{ role: 'user', content: commentText }]);
+        }
+
+        if (replyText) {
+            // ১. কমেন্টে পাব্লিক রিপ্লাই সেন্ড করুন
+            await facebookService.replyToComment(commentId, replyText, pageAccessToken);
+
+            // ২. অপশনাল: ইনবক্সে প্রাইভেট মেসেজ রিপ্লাই দিন
+            if (page.privateReplyEnabled) {
+                const privateText = `হ্যালো ${senderName}! 👋 আপনার কমেন্টের উত্তর দেয়া হয়েছে। আপনার যেকোনো প্রশ্ন বা অর্ডারের জন্য আমাদের ইনবক্সে জানান।`;
+                await facebookService.sendPrivateReplyToComment(commentId, privateText, pageAccessToken);
+            }
+
+            // চ্যাট লগে হিস্ট্রি সেভ করুন
+            try {
+                await ChatLog.create({
+                    pageId,
+                    psid: senderId || 'comment_user',
+                    sender: 'bot',
+                    message: { text: `[Comment Reply to ${senderName}]: ${replyText}` }
+                });
+            } catch (err) {
+                console.error('Error saving comment reply log:', err);
+            }
+
+            // AI রেসপন্স কাউন্ট বাড়িয়ে দিন
+            try {
+                if (page.ownerId) {
+                    await User.findByIdAndUpdate(page.ownerId, {
+                        $inc: { 'subscriptionPlan.aiResponsesUsed': 1 }
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to increment AI response count for comment:', err);
+            }
+        }
+
+        return true;
+    }
 
     // ধাপ ১.১: অ্যাটাচমেন্ট (ছবি) হ্যান্ডেল করুন
     if (type === 'message' && message.attachments && message.attachments.length > 0) {
