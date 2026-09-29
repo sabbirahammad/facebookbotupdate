@@ -8,9 +8,16 @@ const getStoredImage = (file) => ({
     contentType: file.mimetype || 'application/octet-stream',
 });
 
+const getUploadedFiles = (req) => {
+    if (Array.isArray(req.files?.images)) return req.files.images;
+    if (Array.isArray(req.files?.image)) return req.files.image;
+    return req.file ? [req.file] : [];
+};
+
 const toProductResponse = (product) => {
     const response = product.toObject();
     delete response.image;
+    delete response.images;
     return response;
 };
 
@@ -24,6 +31,8 @@ exports.createProduct = async (req, res) => {
         const userId = req.user._id;
         
         const imageUrl = req.body.imageUrl || '';
+        const uploadedFiles = getUploadedFiles(req);
+        const storedImages = uploadedFiles.map(getStoredImage);
 
         // পেজের মালিকানা যাচাই করুন
         const page = await Page.findOne({ pageId: pageId, ownerId: userId });
@@ -37,13 +46,16 @@ exports.createProduct = async (req, res) => {
             price,
             description,
             imageUrl,
-            image: req.file ? getStoredImage(req.file) : undefined,
+            imageUrls: [],
+            image: storedImages[0],
+            images: storedImages,
             stock,
         });
 
         await newProduct.save();
-        if (req.file) {
-            newProduct.imageUrl = `${getPublicBaseUrl(req)}/uploads/products/${newProduct._id}`;
+        if (storedImages.length > 0) {
+            newProduct.imageUrls = storedImages.map((image, index) => `${getPublicBaseUrl(req)}/uploads/products/${newProduct._id}/${index}`);
+            newProduct.imageUrl = newProduct.imageUrls[0];
             await newProduct.save();
         }
         res.status(201).json(toProductResponse(newProduct));
@@ -83,10 +95,14 @@ exports.updateProduct = async (req, res) => {
         const { productId } = req.params;
         const updateData = req.body;
         const userId = req.user._id;
+        const uploadedFiles = getUploadedFiles(req);
 
-        if (req.file) {
-            updateData.image = getStoredImage(req.file);
-            updateData.imageUrl = `${getPublicBaseUrl(req)}/uploads/products/${productId}`;
+        if (uploadedFiles.length > 0) {
+            const storedImages = uploadedFiles.map(getStoredImage);
+            updateData.images = storedImages;
+            updateData.image = storedImages[0];
+            updateData.imageUrls = storedImages.map((image, index) => `${getPublicBaseUrl(req)}/uploads/products/${productId}/${index}`);
+            updateData.imageUrl = updateData.imageUrls[0];
         }
 
         const product = await Product.findById(productId);
@@ -110,16 +126,22 @@ exports.updateProduct = async (req, res) => {
 
 exports.getProductImage = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.productId).select('+image.data image.contentType');
-        if (!product?.image?.data) {
+        const imageIndex = Number(req.params.imageIndex || 0);
+        if (!Number.isInteger(imageIndex) || imageIndex < 0) {
+            return res.sendStatus(404);
+        }
+        const product = await Product.findById(req.params.productId)
+            .select('+image.data image.contentType +images.data images.contentType');
+        const image = product?.images?.[imageIndex] || (imageIndex === 0 ? product?.image : null);
+        if (!image?.data) {
             return res.sendStatus(404);
         }
 
         res.set({
-            'Content-Type': product.image.contentType || 'application/octet-stream',
+            'Content-Type': image.contentType || 'application/octet-stream',
             'Cache-Control': 'public, max-age=86400',
         });
-        return res.send(product.image.data);
+        return res.send(image.data);
     } catch (error) {
         console.error('Error serving product image:', error);
         return res.sendStatus(404);

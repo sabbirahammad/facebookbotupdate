@@ -9,6 +9,37 @@ const { broadcastToPage } = require('./websocket');
 const aiService = require('./aiService');
 const sessionService = require('./sessionService');
 
+const PRODUCTS_PER_CATALOG_PAGE = 3;
+
+const sendProductCatalogPage = async (psid, pageId, pageAccessToken, pageNumber = 0) => {
+    const safePageNumber = Number.isInteger(pageNumber) && pageNumber >= 0 ? pageNumber : 0;
+    const [products, totalProducts] = await Promise.all([
+        Product.find({ pageId }).sort({ createdAt: -1 }).skip(safePageNumber * PRODUCTS_PER_CATALOG_PAGE).limit(PRODUCTS_PER_CATALOG_PAGE),
+        Product.countDocuments({ pageId }),
+    ]);
+    if (products.length === 0) return false;
+
+    const hasMoreProducts = totalProducts > (safePageNumber + 1) * PRODUCTS_PER_CATALOG_PAGE;
+    const elements = products.map((product, index) => {
+        const buttons = [
+            { type: 'postback', title: 'Buy Now', payload: `BUY_${product._id}` },
+            { type: 'web_url', url: 'https://your-website.com/contact', title: 'Contact Us' },
+        ];
+        if (hasMoreProducts && index === products.length - 1) {
+            buttons.push({ type: 'postback', title: 'See More Products', payload: `SHOW_MORE_PRODUCTS_${safePageNumber + 1}` });
+        }
+        return {
+            title: product.name,
+            subtitle: `Price: ${product.price} BDT\nStock: ${product.stock}`,
+            image_url: product.imageUrl,
+            buttons,
+        };
+    });
+
+    await facebookService.sendGenericTemplate(psid, elements, pageAccessToken);
+    return true;
+};
+
 const processMessage = async (jobData) => {
     const { type, pageId, psid, message, postback } = jobData;
 
@@ -245,19 +276,30 @@ const processMessage = async (jobData) => {
             }
         },
         {
+            condition: () => incomingMessageText.startsWith('SHOW_MORE_PRODUCTS_'),
+            action: async () => {
+                const pageNumber = Number(incomingMessageText.replace('SHOW_MORE_PRODUCTS_', ''));
+                const sent = await sendProductCatalogPage(psid, pageId, pageAccessToken, pageNumber);
+                return sent ? null : "\u09a6\u09c1\u0983\u0996\u09bf\u09a4, \u09a6\u09c7\u0996\u09be\u09a8\u09cb\u09b0 \u09ae\u09a4\u09cb \u0986\u09b0 \u0995\u09cb\u09a8\u09cb product \u09a8\u09c7\u0987\u0964";
+            }
+        },
+        {
             condition: () => intent === 'show_product_images',
             action: async () => {
                 const products = await Product.find({ pageId, imageUrl: { $exists: true, $ne: '' } }).limit(50);
                 const searchQuery = entities.productName || incomingMessageText;
                 const matchedProducts = await aiService.findBestMatchingProducts(searchQuery, products);
-                const images = matchedProducts.filter(product => product.imageUrl).slice(0, 4);
+                const images = matchedProducts
+                    .flatMap(product => product.imageUrls?.length ? product.imageUrls : [product.imageUrl])
+                    .filter(Boolean)
+                    .slice(0, 4);
 
                 if (images.length === 0) {
                     return "\u09a6\u09c1\u0983\u0996\u09bf\u09a4, \u098f\u0987 product-\u098f\u09b0 \u0995\u09cb\u09a8\u09cb \u099b\u09ac\u09bf \u0986\u09ae\u09be\u09a6\u09c7\u09b0 \u09b8\u0982\u0997\u09cd\u09b0\u09b9\u09c7 \u09aa\u09be\u0993\u09df\u09be \u09af\u09be\u09df\u09a8\u09bf\u0964";
                 }
 
-                for (const product of images) {
-                    await facebookService.sendImageMessage(psid, product.imageUrl, pageAccessToken);
+                for (const imageUrl of images) {
+                    await facebookService.sendImageMessage(psid, imageUrl, pageAccessToken);
                 }
                 return null;
             }
@@ -265,6 +307,9 @@ const processMessage = async (jobData) => {
         {
             condition: () => intent === 'show_products',
             action: async () => {
+                const sent = await sendProductCatalogPage(psid, pageId, pageAccessToken);
+                if (sent) return null;
+                return "\u09a6\u09c1\u0983\u0996\u09bf\u09a4, \u098f\u0987 \u09ae\u09c1\u09b9\u09c2\u09b0\u09cd\u09a4\u09c7 \u09a6\u09cb\u0995\u09be\u09a8\u09c7 \u0995\u09cb\u09a8\u09cb product \u0989\u09aa\u09b2\u09ac\u09cd\u09a7 \u09a8\u09c7\u0987\u0964";
                 const products = await Product.find({ pageId }).limit(10);
                 if (products && products.length > 0) {
                     const elements = products.map(p => ({

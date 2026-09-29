@@ -50,6 +50,7 @@ app.use('/webhook', express.raw({ type: 'application/json' }));
 
 // অন্যান্য সব রুটের জন্য express.json() ব্যবহার করা হবে
 app.get('/uploads/products/:productId', productController.getProductImage);
+app.get('/uploads/products/:productId/:imageIndex', productController.getProductImage);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json());

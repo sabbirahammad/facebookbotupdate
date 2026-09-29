@@ -20,6 +20,9 @@ const productSchema = new mongoose.Schema({
     imageUrl: {
         type: String,
     },
+    imageUrls: [{
+        type: String,
+    }],
     image: {
         data: {
             type: Buffer,
@@ -27,6 +30,13 @@ const productSchema = new mongoose.Schema({
         },
         contentType: String,
     },
+    images: [{
+        data: {
+            type: Buffer,
+            select: false,
+        },
+        contentType: String,
+    }],
     stock: {
         type: Number,
         default: 0,
