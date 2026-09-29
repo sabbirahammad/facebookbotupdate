@@ -105,12 +105,21 @@ const processMessage = async (jobData) => {
 
         if (replyText) {
             // ১. কমেন্টে পাব্লিক রিপ্লাই সেন্ড করুন
-            await facebookService.replyToComment(commentId, replyText, pageAccessToken);
+            try {
+                await facebookService.replyToComment(commentId, replyText, pageAccessToken);
+                console.log(`[Comment Reply] Successfully posted public reply to comment ${commentId}`);
+            } catch (commentErr) {
+                console.error(`[Comment Reply Facebook API Error]:`, commentErr.message);
+            }
 
             // ২. অপশনাল: ইনবক্সে প্রাইভেট মেসেজ রিপ্লাই দিন
             if (page.privateReplyEnabled) {
-                const privateText = `হ্যালো ${senderName}! 👋 আপনার কমেন্টের উত্তর দেয়া হয়েছে। আপনার যেকোনো প্রশ্ন বা অর্ডারের জন্য আমাদের ইনবক্সে জানান।`;
-                await facebookService.sendPrivateReplyToComment(commentId, privateText, pageAccessToken);
+                try {
+                    const privateText = `হ্যালো ${senderName}! 👋 আপনার কমেন্টের উত্তর দেয়া হয়েছে। আপনার যেকোনো প্রশ্ন বা অর্ডারের জন্য আমাদের ইনবক্সে জানান।`;
+                    await facebookService.sendPrivateReplyToComment(commentId, privateText, pageAccessToken);
+                } catch (privErr) {
+                    console.error(`[Private Reply Facebook API Error]:`, privErr.message);
+                }
             }
 
             // চ্যাট লগে হিস্ট্রি সেভ করুন

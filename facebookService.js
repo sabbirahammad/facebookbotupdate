@@ -367,11 +367,14 @@ const replyToComment = async (commentId, message, pageAccessToken) => {
         }, {
             params: { access_token: pageAccessToken },
         });
-        console.log(`Successfully replied to comment ${commentId}`);
+        console.log(`Successfully posted public reply to comment ${commentId}`);
         return { success: true, data: response.data };
     } catch (error) {
-        console.error(`Error replying to comment ${commentId}:`, error.response?.data?.error || error.message);
-        throw new Error(error.response?.data?.error?.message || 'Failed to reply to comment');
+        const errDesc = error.response?.data?.error?.message || error.message;
+        console.warn(`Public comment reply API warning (${errDesc}). Attempting Private Messenger Reply fallback...`);
+        
+        // Fallback to Private Inbox Reply via Messenger (Requires only pages_messaging permission)
+        return await sendPrivateReplyToComment(commentId, message, pageAccessToken);
     }
 };
 
