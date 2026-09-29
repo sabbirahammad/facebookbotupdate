@@ -111,6 +111,7 @@ const getIntentAndEntities = async (userMessage) => {
 
     Possible intents are:
     - 'show_products': ONLY use this if the user is explicitly asking to see your catalog, collection, or want to view products (e.g., "show me t-shirts", "catalog daw"). DO NOT use 'show_products' if they are just asking a general, business, or casual question that happens to contain a product name or the word 'product' (e.g., "Ami t-shirt sell kori, apnadr product niye kivabe business korbo?"). In those cases, classify the intent as 'general_question'.
+    - 'show_product_images': User explicitly asks for photos, pictures, images, or pics of a named product or product type (e.g., "batik er chobi dao", "show photos of salwar kameez").
     - 'start_order': User wants to buy or order a specific product.
     - 'provide_contact_info': User is providing their name, phone number, or address.
     - 'track_order': User wants to know the status of their order.

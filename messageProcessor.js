@@ -245,6 +245,24 @@ const processMessage = async (jobData) => {
             }
         },
         {
+            condition: () => intent === 'show_product_images',
+            action: async () => {
+                const products = await Product.find({ pageId, imageUrl: { $exists: true, $ne: '' } }).limit(50);
+                const searchQuery = entities.productName || incomingMessageText;
+                const matchedProducts = await aiService.findBestMatchingProducts(searchQuery, products);
+                const images = matchedProducts.filter(product => product.imageUrl).slice(0, 4);
+
+                if (images.length === 0) {
+                    return "\u09a6\u09c1\u0983\u0996\u09bf\u09a4, \u098f\u0987 product-\u098f\u09b0 \u0995\u09cb\u09a8\u09cb \u099b\u09ac\u09bf \u0986\u09ae\u09be\u09a6\u09c7\u09b0 \u09b8\u0982\u0997\u09cd\u09b0\u09b9\u09c7 \u09aa\u09be\u0993\u09df\u09be \u09af\u09be\u09df\u09a8\u09bf\u0964";
+                }
+
+                for (const product of images) {
+                    await facebookService.sendImageMessage(psid, product.imageUrl, pageAccessToken);
+                }
+                return null;
+            }
+        },
+        {
             condition: () => intent === 'show_products',
             action: async () => {
                 const products = await Product.find({ pageId }).limit(10);

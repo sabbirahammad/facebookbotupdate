@@ -216,6 +216,30 @@ const sendGenericTemplate = async (psid, elements, pageAccessToken) => {
     }
 };
 
+const sendImageMessage = async (psid, imageUrl, pageAccessToken) => {
+    const requestBody = {
+        recipient: { id: psid },
+        message: {
+            attachment: {
+                type: 'image',
+                payload: { url: imageUrl, is_reusable: true },
+            },
+        },
+        messaging_type: 'RESPONSE',
+    };
+
+    try {
+        await axios.post(`${GRAPH_API_BASE_URL}/me/messages`, requestBody, {
+            params: { access_token: pageAccessToken },
+        });
+        console.log(`Image sent to PSID: ${psid}`);
+        return true;
+    } catch (error) {
+        console.error('Error sending image:', error.response?.data?.error || error.message);
+        return false;
+    }
+};
+
 /**
  * Sends a Button Template to a user.
  * @param {string} psid - The Page-Scoped ID of the user.
@@ -339,6 +363,7 @@ module.exports = {
     encryptToken,
     decryptToken,
     sendTextMessage,
+    sendImageMessage,
     sendGenericTemplate,
     sendButtonTemplate,
     sendSenderAction,
