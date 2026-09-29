@@ -40,6 +40,11 @@ exports.processWebhook = (req, res) => {
             return res.status(400).send('Signature not found.');
         }
 
+        if (!process.env.META_APP_SECRET) {
+            console.error('META_APP_SECRET is not set. Cannot verify signature.');
+            return res.status(500).send('Server configuration error.');
+        }
+
         // server.js-এ express.raw() ব্যবহার করার কারণে req.body এখন একটি buffer
         const expectedSignature = 'sha256=' + crypto.createHmac('sha256', process.env.META_APP_SECRET).update(req.body).digest('hex');
 
