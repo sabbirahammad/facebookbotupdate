@@ -8,6 +8,7 @@ const authRoutes = require('./auth.routes');
 const pageRoutes = require('./pageRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
 const productRoutes = require('./productRoutes');
+const productController = require('./productController');
 const orderRoutes = require('./orderRoutes'); // This seems to be a duplicate import
 const inboxRoutes = require('./inboxRoutes'); // আপনার তৈরি করা নতুন রুট ফাইলটিযোগ করা হয়েছে
 const quickReplyRoutes = require('./quickReplyRoutes');
@@ -39,6 +40,7 @@ if (useRedis) {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.set('trust proxy', 1);
 
 // Enable CORS for all routes
 app.use(cors());
@@ -47,6 +49,7 @@ app.use(cors());
 app.use('/webhook', express.raw({ type: 'application/json' }));
 
 // অন্যান্য সব রুটের জন্য express.json() ব্যবহার করা হবে
+app.get('/uploads/products/:productId', productController.getProductImage);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json());

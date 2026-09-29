@@ -1,6 +1,19 @@
 const Product = require('./Product');
 const Page = require('./Page');
 
+const getPublicBaseUrl = (req) => (process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+
+const getStoredImage = (file) => ({
+    data: file.buffer,
+    contentType: file.mimetype || 'application/octet-stream',
+});
+
+const toProductResponse = (product) => {
+    const response = product.toObject();
+    delete response.image;
+    return response;
+};
+
 /**
  * একটি নির্দিষ্ট পেজের জন্য একটি নতুন প্রোডাক্ট তৈরি করে।
  */
@@ -10,10 +23,7 @@ exports.createProduct = async (req, res) => {
         const { name, price, description, stock } = req.body;
         const userId = req.user._id;
         
-        let imageUrl = req.body.imageUrl || '';
-        if (req.file) {
-            imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-        }
+        const imageUrl = req.body.imageUrl || '';
 
         // পেজের মালিকানা যাচাই করুন
         const page = await Page.findOne({ pageId: pageId, ownerId: userId });
@@ -27,11 +37,16 @@ exports.createProduct = async (req, res) => {
             price,
             description,
             imageUrl,
+            image: req.file ? getStoredImage(req.file) : undefined,
             stock,
         });
 
         await newProduct.save();
-        res.status(201).json(newProduct);
+        if (req.file) {
+            newProduct.imageUrl = `${getPublicBaseUrl(req)}/uploads/products/${newProduct._id}`;
+            await newProduct.save();
+        }
+        res.status(201).json(toProductResponse(newProduct));
     } catch (error) {
         console.error("Error creating product:", error);
         res.status(500).json({ message: "Internal server error." });
@@ -70,7 +85,8 @@ exports.updateProduct = async (req, res) => {
         const userId = req.user._id;
 
         if (req.file) {
-            updateData.imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            updateData.image = getStoredImage(req.file);
+            updateData.imageUrl = `${getPublicBaseUrl(req)}/uploads/products/${productId}`;
         }
 
         const product = await Product.findById(productId);
@@ -85,10 +101,28 @@ exports.updateProduct = async (req, res) => {
         }
 
         const updatedProduct = await Product.findByIdAndUpdate(productId, updateData, { new: true });
-        res.status(200).json(updatedProduct);
+        res.status(200).json(toProductResponse(updatedProduct));
     } catch (error) {
         console.error("Error updating product:", error);
         res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+exports.getProductImage = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.productId).select('+image.data image.contentType');
+        if (!product?.image?.data) {
+            return res.sendStatus(404);
+        }
+
+        res.set({
+            'Content-Type': product.image.contentType || 'application/octet-stream',
+            'Cache-Control': 'public, max-age=86400',
+        });
+        return res.send(product.image.data);
+    } catch (error) {
+        console.error('Error serving product image:', error);
+        return res.sendStatus(404);
     }
 };
 
